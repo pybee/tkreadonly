@@ -13,15 +13,15 @@ tkReadOnly can be installed from PyPI::
 ReadOnlyText
 ------------
 
-An extension of the ``ttk.Text`` widget that disables all user input.
+An extension of the ``ttk.Text`` widget that disables all user editing.
 
-The builtin ttk.Text widget doesn't have a "readonly" mode - you can
+The builtin ttk.Text widget doesn't have a "readonly" mode. You can
 disable the widget, but this also disables selection and other mouse
 events, and it changes the color scheme of the text.
 
-This widget captures the insertion and deletion events, and redirects
-them to the bitbucket. This allows the rest of the widget to look and
-behave like a normal ``ttk.Text`` widget
+This widget captures and discards all insertion and deletion events on the
+Text widget. This allows the widget to look and behave like a normal
+``ttk.Text`` widget in all other regards.
 
 Arguments
 ~~~~~~~~~
@@ -37,19 +37,24 @@ widget.
 Example::
 
     from Tkinter import *
-    from ttk import *
 
     from tkreadonly import ReadOnlyText
 
+    # Create the main Tk window
     root = Tk()
 
-    main_frame = Frame()
+    # Create a main frame
+    main_frame = Frame(root)
     main_frame.grid(column=0, row=0, sticky=(N, S, E, W))
 
+    # Put a ReadOnlyText widget in the main frame
     read_only = ReadOnlyText(main_frame)
     read_only.grid(column=0, row=0, sticky=(N, S, E, W))
+
+    # Add text to the end of the widget.
     read_only.insert(END, 'Hello world')
 
+    # Run the main loop
     root.mainloop()
 
 ReadOnlyCode
@@ -61,48 +66,100 @@ with a vertical scrollbar.
 Arguments
 ~~~~~~~~~
 
-style:
+``style``
 
     The Pygments style sheet to use. Default is ``monokai``.
 
-lexer:
+``lexer``
 
     The Pygments lexer to use. Default is ``PythonLexer``.
 
 
+Attributes
+~~~~~~~~~~
+
+``filename``
+
+    The filename currently being displayed. If you set this attribute,
+    the path you provide will be loaded into the code window.
+
+``line``
+
+    The current line of the file. The current line will be highlighted.
+    If you set this attribute, any existing current line will be cleared
+    and the new line highlighted.
+
 Methods
 ~~~~~~~
 
-show(filename, line=None, refresh=False):
+``refresh()``
 
-    Show the given filename, highlighting the specific line number.
-    If line is None, no line will be highlighted, and the window will
-    be scrolled to line 1.
+    Force a reload of the current file.
 
-    The widget remembers the file that is currently loaded;
-    if you present the same file again, it won't be reopened and reloaded.
+``line_bind(sequence, func)``
 
-    However, if you pass in refresh=False, it will be.
+    Bind the ``func`` event handler to the given event sequence on a line
+    number. If an binding for the given sequence already exists, it will be
+    overwritten.
+
+    Supports ``<Button-1>``-``<Button-5>``, and ``<Double-1>``-``<Double-5>``
+    sequences, with the ``Shift``, ``Alt``, and ``Control`` modifiers.
+
+    When an event occurs, the handler will be invoked with a single argument -
+    the event that occurred. This event object will have a ``line`` attribute
+    that describes the line that generated the event.
+
+``name_bind(sequence, func)``
+
+    Bind ``func`` event handler to the given event sequence on a token in
+    the code. If an binding for the given sequence already exists, it will
+    be overwritten.
+
+    Supports ``<Button-1>``-``<Button-5>``, and ``<Double-1>``-``<Double-5>``
+    sequences, with the ``Shift``, ``Alt``, and ``Control`` modifiers.
+
+    When an event occurs, the handler will be invoked with a single argument -
+    the event that occurred. This event object will have a ``name`` attribute
+    that describes the token that generated the event.
 
 Usage
 ~~~~~
 
-
 Example::
 
     from Tkinter import *
-    from ttk import *
+    import tkMessageBox
 
     from tkreadonly import ReadOnlyCode
 
+    # Create the main Tk window
     root = Tk()
 
-    main_frame = Frame()
+    # Create the main frame
+    main_frame = Frame(root)
     main_frame.grid(column=0, row=0, sticky=(N, S, E, W))
 
+    # Create a ReadOnlyCode widget in the main frame
     read_only = ReadOnlyCode(main_frame)
     read_only.grid(column=0, row=0, sticky=(N, S, E, W))
-    read_only.show('/path/to/file.py', line=5)
 
+    # Show a particular file
+    read_only.filename = '/path/to/file.py'
+
+    # Highlight a particular line in the file
+    read_only.line = 5
+
+    # Set up a handler for a double click on a line number
+    def line_handler(event):
+        tkMessageBox.showinfo(message='Click on line %s' % event.line)
+
+    read_only.line_bind('<Double-1>', line_handler)
+
+    # Set up a handler for a single click on a code variable
+    def name_handler(event):
+        tkMessageBox.showinfo(message='Click on token %s' % event.name)
+
+    read_only.name_bind('<Button-1>', name_handler)
+
+    # Run the main event loop
     root.mainloop()
-

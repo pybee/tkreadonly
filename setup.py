@@ -2,7 +2,6 @@
 import sys
 
 from setuptools import setup
-from tkreadonly import VERSION
 
 try:
     readme = open('README.rst')
@@ -12,7 +11,7 @@ finally:
 
 setup(
     name='tkreadonly',
-    version=VERSION,
+    version='0.5.0',
     description='A set of Tkinter widgets to display readonly text and code.',
     long_description=long_description,
     author='Russell Keith-Magee',

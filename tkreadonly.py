@@ -8,36 +8,37 @@ from pygments.styles import get_style_by_name
 from pygments.token import Token
 
 
-__all__ = ('VERSION', 'ReadOnlyText', 'ReadOnlyCode')
+__all__ = ('ReadOnlyText', 'ReadOnlyCode')
 
-NUM_VERSION = (0, 5, 0)
-VERSION = '0.5.0'
 
-NORMALIZED_EVENT = {
-    '<1>': '<Button-1>',
-    '<2>': '<Button-2>',
-    '<3>': '<Button-3>',
-    '<4>': '<Button-4>',
-    '<5>': '<Button-5>',
+def normalize_sequence(sequence):
+    """Normalize sequence names to a common format.
 
-    '<Button-1>': '<Button-1>',
-    '<Button-2>': '<Button-2>',
-    '<Button-3>': '<Button-3>',
-    '<Button-4>': '<Button-4>',
-    '<Button-5>': '<Button-5>',
+    This is required so that <1>, <Button-1>, and <ButtonPress-1> all
+    map to the same handler, and so that <Alt-Shift-Control-1> and
+    <Shift-Alt-Control-1> map to the same event.
+    """
+    # Split on the dash character
+    parts = sequence[1:-1].split('-')
 
-    '<ButtonPress-1>': '<Button-1>',
-    '<ButtonPress-2>': '<Button-2>',
-    '<ButtonPress-3>': '<Button-3>',
-    '<ButtonPress-4>': '<Button-4>',
-    '<ButtonPress-5>': '<Button-5>',
+    if len(parts) == 1:
+        # If there's only one part, it's a button press number
+        normalized = ['Button', parts[-1]]
+    else:
+        # Look at the second last part. If it's Double, handle as a
+        # double click. If it's Button or ButtonPress, handle as
+        # Button. Otherwise, it's a button press.
 
-    '<Double-1>': '<Double-1>',
-    '<Double-2>': '<Double-2>',
-    '<Double-3>': '<Double-3>',
-    '<Double-4>': '<Double-4>',
-    '<Double-5>': '<Double-5>',
-}
+        # Any modifiers before the bit describing the button/double
+        # should be sorted alphabetically.
+        if parts[-2] == 'Double':
+            normalized = sorted(parts[:-2]) + parts[-2:]
+        elif parts[-2] in ('Button', 'ButtonPress'):
+            normalized = sorted(parts[:-2]) + ['Button', parts[-1]]
+        else:
+            normalized = sorted(parts[:-1]) + ['Button', parts[-1]]
+
+    return '<%s>' % '-'.join(normalized)
 
 
 def tk_break(*args, **kwargs):
@@ -148,13 +149,18 @@ class ReadOnlyCode(Frame, object):
         self.vScrollbar.config(command=combine(self.lines.yview, self.code.yview))
 
         # Set up internal event handlers.
-        for sequence in [
-                    '<Button-1>', '<Button-2>', '<Button-3>', '<Button-4>', '<Button-5>',
-                    '<Double-1>', '<Double-2>', '<Double-3>', '<Double-4>', '<Double-5>',
+        for modifier in [
+                    '',
+                    'Alt-', 'Alt-Control-', 'Alt-Shift-', 'Alt-Control-Shift-',
+                    'Control-', 'Control-Shift-',
+                    'Shift-'
                 ]:
-            self.lines.bind(sequence, self._on_line_handler(sequence))
+            for action in ['Button', 'Double']:
+                for button in range(1, 6):
+                    sequence = '<%s%s-%s>' % (modifier, action, button)
+                    self.lines.bind(sequence, self._on_line_handler(sequence))
 
-            self.code.tag_bind(str(Token.Name), sequence, self._on_name_handler(sequence))
+                    self.code.tag_bind(str(Token.Name), sequence, self._on_name_handler(sequence))
 
         # Configure the weights for the grid.
         # All the weight goes to the code view.
@@ -247,11 +253,11 @@ class ReadOnlyCode(Frame, object):
 
     def line_bind(self, sequence, func):
         "Bind a sequence on line numbers to the given function"
-        self._line_bindings[NORMALIZED_EVENT[sequence]] = func
+        self._line_bindings[normalize_sequence(sequence)] = func
 
     def name_bind(self, sequence, func):
         "Bind a sequence on tokenized names to the given function"
-        self._name_bindings[NORMALIZED_EVENT[sequence]] = func
+        self._name_bindings[normalize_sequence(sequence)] = func
 
     def _on_line_handler(self, sequence):
         "Create an internal handler for events on a line number."
