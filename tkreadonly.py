@@ -13,6 +13,32 @@ __all__ = ('VERSION', 'ReadOnlyText', 'ReadOnlyCode')
 NUM_VERSION = (0, 5, 0)
 VERSION = '0.5.0'
 
+NORMALIZED_EVENT = {
+    '<1>': '<Button-1>',
+    '<2>': '<Button-2>',
+    '<3>': '<Button-3>',
+    '<4>': '<Button-4>',
+    '<5>': '<Button-5>',
+
+    '<Button-1>': '<Button-1>',
+    '<Button-2>': '<Button-2>',
+    '<Button-3>': '<Button-3>',
+    '<Button-4>': '<Button-4>',
+    '<Button-5>': '<Button-5>',
+
+    '<ButtonPress-1>': '<Button-1>',
+    '<ButtonPress-2>': '<Button-2>',
+    '<ButtonPress-3>': '<Button-3>',
+    '<ButtonPress-4>': '<Button-4>',
+    '<ButtonPress-5>': '<Button-5>',
+
+    '<Double-1>': '<Double-1>',
+    '<Double-2>': '<Double-2>',
+    '<Double-3>': '<Double-3>',
+    '<Double-4>': '<Double-4>',
+    '<Double-5>': '<Double-5>',
+}
+
 
 def tk_break(*args, **kwargs):
     "Return a Tk 'break' event result."
@@ -55,7 +81,7 @@ class ReadOnlyText(Text):
         self.delete = self.redirector.register("delete", tk_break)
 
 
-class ReadOnlyCode(Frame):
+class ReadOnlyCode(Frame, object):
     """A widget for displaying read-only, syntax highlighted code.
 
     """
@@ -65,12 +91,18 @@ class ReadOnlyCode(Frame):
         # Set the lexer to use for this code object
         self.lexer = kwargs.pop('lexer', PythonLexer)
 
-        # initialize the base frame with the remaining arguments.
-        Frame.__init__(self, *args, **kwargs)
+        # Initialize the base frame with the remaining arguments.
+        super(ReadOnlyCode, self).__init__(*args, **kwargs)
 
-        # What is currently being displayed
-        self.current_file = None
-        self.current_line = None
+        # The file and line currently being displayed
+        self._filename = None
+        self._line = None
+
+        # The list of bound event handlers
+        # Handlers for actions on a line number
+        self._line_bindings = {}
+        # Handlers for actions on a tokenized NAME
+        self._name_bindings = {}
 
         # The Text widget holding the line numbers.
         self.lines = Text(self,
@@ -105,13 +137,6 @@ class ReadOnlyCode(Frame):
 
         self.code.tag_configure("current_line", background=self.style.highlight_color)
 
-        # Set up event handlers:
-        # - Double clicking on a variable
-        self.code.tag_bind(str(Token.Name), '<Double-1>', self._on_code_variable_double_click)
-
-        # - Double clicking on a line number
-        self.lines.bind('<Double-1>', self._on_line_double_click)
-
         # The widgets vertical scrollbar
         self.vScrollbar = Scrollbar(self, orient=VERTICAL)
         self.vScrollbar.grid(column=2, row=0, sticky=(N, S))
@@ -121,6 +146,15 @@ class ReadOnlyCode(Frame):
         self.code.config(yscrollcommand=combine(text_set(self.lines), self.vScrollbar.set))
         self.lines.config(yscrollcommand=combine(text_set(self.code), self.vScrollbar.set))
         self.vScrollbar.config(command=combine(self.lines.yview, self.code.yview))
+
+        # Set up internal event handlers.
+        for sequence in [
+                    '<Button-1>', '<Button-2>', '<Button-3>', '<Button-4>', '<Button-5>',
+                    '<Double-1>', '<Double-2>', '<Double-3>', '<Double-4>', '<Double-5>',
+                ]:
+            self.lines.bind(sequence, self._on_line_handler(sequence))
+
+            self.code.tag_bind(str(Token.Name), sequence, self._on_name_handler(sequence))
 
         # Configure the weights for the grid.
         # All the weight goes to the code view.
@@ -144,20 +178,17 @@ class ReadOnlyCode(Frame):
                 kwargs['background'] = part[3:]
         return kwargs
 
-    def show(self, filename, line=None, refresh=False):
-        """Show a specific line of a specific file.
+    @property
+    def filename(self):
+        "Return the current file being displayed by the view"
+        return self._filename
 
-        If line is None, no current line will be highlighted
-        If refresh is True, the file will be reloaded regardless
-
-        Returns true if a file refresh was performed.
-        """
-        # If the file has changed, or a refresh has been requested,
-        # reload the file.
-        if refresh or self.current_file != filename:
-            file_change = True
+    @filename.setter
+    def filename(self, value):
+        "Set the file being displayed by the view"
+        if self._filename != value:
             self.code.delete('1.0', END)
-            with open(filename) as code:
+            with open(value) as code:
                 for token, content in lex(code.read(), self.lexer()):
                     self.code.insert(END, content, str(token))
 
@@ -171,58 +202,87 @@ class ReadOnlyCode(Frame):
             self.lines.config(state=DISABLED)
 
             # Store the new filename, and clear any current line
-            self.current_file = filename
-            self.current_line = None
-        else:
-           file_change = False
+            self._filename = value
+            self._line = None
 
-        if self.current_line:
+    def refresh(self):
+        "Force a refresh of the file currently in the view"
+        # Remember the old file, set the internal tracking of the
+        # filename to None, then use the property to set the filename
+        # again. Since the internal representation has changed, this
+        # will force a reload.
+        filename = self._filename
+        self._filename = None
+        self.filename = filename
+
+    @property
+    def line(self):
+        return self._line
+
+    @line.setter
+    def line(self, value):
+        # If the line is currently displayed, clear the current_line
+        # tag from the code view.
+        if self._line:
             self.code.tag_remove('current_line',
-                '%s.0' % self.current_line,
-                '%s.0' % (self.current_line + 1)
+                '%s.0' % self._line,
+                '%s.0' % (self._line + 1)
             )
 
-        self.current_line = line
-        if self.current_line:
-            self.code.see('%s.0' % self.current_line)
+        # Save the new value for the line
+        self._line = value
+
+        # If there is a new value for the line, set the current_line
+        # tag from the code view, and make that line visible; if
+        # there isn't a new line, set the view to point at line 1.
+        if self._line:
+            self.code.see('%s.0' % self._line)
             self.code.tag_add('current_line',
-                '%s.0' % self.current_line,
-                '%s.0' % (self.current_line + 1)
+                '%s.0' % self._line,
+                '%s.0' % (self._line + 1)
             )
         else:
             # Reset the view
             self.code.see('1.0')
 
-        return file_change
+    def line_bind(self, sequence, func):
+        "Bind a sequence on line numbers to the given function"
+        self._line_bindings[NORMALIZED_EVENT[sequence]] = func
 
-    def clear_current_line(self):
-        "Clear any selection for the current line"
-        if self.current_line:
-            self.code.tag_remove('current_line',
-                '%s.0' % self.current_line,
-                '%s.0' % (self.current_line + 1)
-            )
-            self.current_line = None
+    def name_bind(self, sequence, func):
+        "Bind a sequence on tokenized names to the given function"
+        self._name_bindings[NORMALIZED_EVENT[sequence]] = func
 
-        self.code.see('1.0')
+    def _on_line_handler(self, sequence):
+        "Create an internal handler for events on a line number."
+        def line_handler(event):
+            line = int(self.code.index("@%s,%s" % (event.x, event.y)).split('.')[0])
+            try:
+                handler = self._line_bindings[sequence]
 
-    def _on_line_double_click(self, event):
-        """Internal event handler when a double click event is registered in the lines area.
+                # Modify the event for passing on external handlers
+                event.widget = self
+                event.line = line
+                handler(event)
+            except KeyError:
+                # No handler registered
+                pass
+        return line_handler
 
-        Converted into an event on a specific line for public API purposes.
-        """
-        line = int(self.code.index("@%s,%s" % (event.x, event.y)).split('.')[0])
-        self.on_line_double_click(line)
+    def _on_name_handler(self, sequence):
+        "Create an internal handler for events on a tokenized name."
+        def name_handler(event):
+            range = self.code.tag_nextrange(str(Token.Name), "@%s,%s wordstart" % (event.x, event.y))
+            name = self.code.get(range[0], range[1])
 
-    def on_line_double_click(self, line):
-        "Response when a line number is double clicked"
-        pass
+            try:
+                handler = self._name_bindings[sequence]
 
-    def _on_code_variable_double_click(self, event):
-        "Response when a double click event is registered on a variable."
-        range = self.code.tag_nextrange(str(Token.Name), "@%s,%s wordstart" % (event.x, event.y))
-        self.on_code_variable_double_click(self.code.get(range[0], range[1]))
-
-    def on_code_variable_double_click(self, var):
-        "Response when a code variable is double clicked"
-        pass
+                # Modify the event for passing on external handlers
+                event.widget = self
+                event.name = name
+                handler(event)
+            except KeyError:
+                # No handler registered
+                pass
+        return name_handler
