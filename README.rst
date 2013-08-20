@@ -61,7 +61,8 @@ ReadOnlyCode
 ------------
 
 A composite widget that lets you display line number-annotated code,
-with a vertical scrollbar.
+with a vertical scrollbar. The syntax highlighting will be automatically
+guessed from the filename and/or file contents.
 
 Arguments
 ~~~~~~~~~
@@ -69,10 +70,6 @@ Arguments
 ``style``
 
     The Pygments style sheet to use. Default is ``monokai``.
-
-``lexer``
-
-    The Pygments lexer to use. Default is ``PythonLexer``.
 
 
 Attributes

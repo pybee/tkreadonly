@@ -1,6 +1,4 @@
 #/usr/bin/env python
-import sys
-
 from setuptools import setup
 
 try:
@@ -11,7 +9,7 @@ finally:
 
 setup(
     name='tkreadonly',
-    version='0.5.0',
+    version='0.5.1',
     description='A set of Tkinter widgets to display readonly text and code.',
     long_description=long_description,
     author='Russell Keith-Magee',

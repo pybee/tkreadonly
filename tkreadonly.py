@@ -3,7 +3,7 @@ from Tkinter import *
 from ttk import *
 
 from pygments import lex
-from pygments.lexers import PythonLexer
+from pygments.lexers import guess_lexer_for_filename
 from pygments.styles import get_style_by_name
 from pygments.token import Token
 
@@ -89,8 +89,6 @@ class ReadOnlyCode(Frame, object):
     def __init__(self, *args, **kwargs):
         # Get the code style
         self.style = get_style_by_name(kwargs.pop('style', 'monokai'))
-        # Set the lexer to use for this code object
-        self.lexer = kwargs.pop('lexer', PythonLexer)
 
         # Initialize the base frame with the remaining arguments.
         super(ReadOnlyCode, self).__init__(*args, **kwargs)
@@ -195,7 +193,9 @@ class ReadOnlyCode(Frame, object):
         if self._filename != value:
             self.code.delete('1.0', END)
             with open(value) as code:
-                for token, content in lex(code.read(), self.lexer()):
+                all_content = code.read()
+                lexer = guess_lexer_for_filename(value, all_content, stripnl=False)
+                for token, content in lex(all_content, lexer):
                     self.code.insert(END, content, str(token))
 
             # Now update the text for the linenumbers
