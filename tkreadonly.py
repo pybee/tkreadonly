@@ -104,7 +104,7 @@ class ReadOnlyCode(Frame, object):
     def __init__(self, *args, **kwargs):
         # Get the code style
         self.style = get_style_by_name(kwargs.pop('style', 'monokai'))
-
+        self.lexer = kwargs.pop('lexer')
         # Initialize the base frame with the remaining arguments.
         super(ReadOnlyCode, self).__init__(*args, **kwargs)
 
@@ -209,7 +209,10 @@ class ReadOnlyCode(Frame, object):
             self.code.delete('1.0', END)
             with open(value) as code:
                 all_content = code.read()
-                lexer = guess_lexer_for_filename(value, all_content, stripnl=False)
+                if self.lexer:
+                    lexer = self.lexer
+                else:
+                    lexer = guess_lexer_for_filename(value, all_content, stripnl=False)
                 for token, content in lex(all_content, lexer):
                     self.code.insert(END, content, str(token))
 
