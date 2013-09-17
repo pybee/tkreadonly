@@ -104,7 +104,7 @@ class ReadOnlyCode(Frame, object):
     def __init__(self, *args, **kwargs):
         # Get the code style
         self.style = get_style_by_name(kwargs.pop('style', 'monokai'))
-        self.lexer = kwargs.pop('lexer')
+        self.lexer = kwargs.pop('lexer', None)
         # Initialize the base frame with the remaining arguments.
         super(ReadOnlyCode, self).__init__(*args, **kwargs)
 
