@@ -14,8 +14,12 @@ except ImportError:
                         "Check your operating system instructions " +
                         "to work out how to install IDLE and idlelib.")
 
-from Tkinter import *
-from ttk import *
+try:
+    from Tkinter import *
+    from ttk import *
+except ImportError:
+    from tkinter import *
+    from tkinter.ttk import *
 
 from pygments import lex
 from pygments.lexers import guess_lexer_for_filename
