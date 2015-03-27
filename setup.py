@@ -9,7 +9,7 @@ finally:
 
 setup(
     name='tkreadonly',
-    version='0.5.4',
+    version='0.6.0',
     description='A set of Tkinter widgets to display readonly text and code.',
     long_description=long_description,
     author='Russell Keith-Magee',
@@ -29,6 +29,7 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 3',
         'Topic :: Software Development',
         'Topic :: Utilities',
     ],
