@@ -1,5 +1,9 @@
 try:
-    from idlelib.WidgetRedirector import WidgetRedirector
+    try:
+        from idlelib.WidgetRedirector import WidgetRedirector
+    except ImportError:
+        # Renamed in Python 3.6 (see http://bugs.python.org/issue24225)
+        from idlelib.redirector import WidgetRedirector
 except ImportError:
     import platform
     import sys
